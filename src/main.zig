@@ -9,15 +9,88 @@ pub fn main() void {
     const stdin = std.io.getStdIn();
     defer stdin.close();
 
+    var gpalloc = std.heap.DebugAllocator(.{}).init;
+    const gpa = gpalloc.allocator();
+    defer _ = gpalloc.deinit();
+
+    var args = std.process.argsWithAllocator(gpa) catch unreachable;
+    defer args.deinit();
+    args = args;
+
+    if (args.next() == null) {
+        print("zclip: not even a 0th arg?\n", .{});
+        std.process.exit(1);
+    }
+
+    const state = parseArgs(&args);
+
+    if (state.help) {
+        print("zlcip: copies piped in text to the clipboard\n", .{});
+        print("    valid arguments:\n", .{});
+        print("        --help    print this message\n", .{});
+        print("        --lower   lowercase the text\n", .{});
+        print("        --upper   uppercase the text\n", .{});
+        print("        --trim    trim whitespace from the text\n", .{});
+        print("        --quiet   doesn't print the text\n", .{});
+
+        return;
+    }
+
     // check that the session isn't interactive
     if (stdin.isTty()) {
         print("zclip: data must be piped to stdin\n", .{});
         std.process.exit(1);
     }
 
-    var gpalloc = std.heap.DebugAllocator(.{}).init;
-    const gpa = gpalloc.allocator();
-    defer _ = gpalloc.deinit();
+    // read data from stdin
+    var data = stdin.readToEndAlloc(gpa, max_bytes) catch {
+        print("zclip: input too large - {d} byte limit\n", .{max_bytes});
+        std.process.exit(1);
+    };
+    defer gpa.free(data);
+
+    var index: usize = 0;
+
+    if (state.lower and state.upper) { // esponge case
+        print("TODO: esponge", .{});
+        std.process.exit(2);
+    } else {
+        if (state.lower) { // lowercase
+            index = 0;
+            while (index < data.len) : (index += 1) {
+                const char = data[index];
+                if (char >= 65 and char <= 90) {
+                    data[index] = char + 32;
+                }
+            }
+        }
+
+        if (state.upper) { // upper case
+            index = 0;
+            while (index < data.len) : (index += 1) {
+                const char = data[index];
+                if (char >= 97 and char <= 122) {
+                    data[index] = char - 32;
+                }
+            }
+        }
+    }
+
+    if (state.trim) { // trim
+        print("TODO: trim", .{});
+        std.process.exit(2);
+        var start = 0;
+        var end = data.len;
+
+        data = data[start..end];
+    }
+
+    // allocate memory with the global allocator as per documentation
+    const gptr_int = win32.system.memory.GlobalAlloc(.{}, max_bytes + 1);
+    if (gptr_int == 0) {
+        print("zclip: global alloc failed\n", .{});
+        std.process.exit(1);
+    }
 
     // open clipboard
     if (win32.system.data_exchange.OpenClipboard(null) != 1) {
@@ -35,28 +108,19 @@ pub fn main() void {
         std.process.exit(1);
     }
 
-    // read data from stdin
-    const data = stdin.readToEndAlloc(gpa, max_bytes) catch {
-        print("zclip: input too large - {d} byte limit\n", .{max_bytes});
-        std.process.exit(1);
-    };
-    defer gpa.free(data);
-
-    // allocate memory with the global allocator as per documentation
-    const gptr_int = win32.system.memory.GlobalAlloc(.{}, max_bytes + 1);
-    if (gptr_int == 0) {
-        print("zclip: global alloc failed\n", .{});
-        std.process.exit(1);
-    }
-
     // convert this to a zig-useable pointer of u8
     var gptr: [*]u8 = @ptrFromInt(@as(usize, @intCast(gptr_int)));
 
     for (data, 0..) |byte, i| {
         gptr[i] = byte;
-        print("{c}", .{byte});
+        if (!state.quiet) {
+            print("{c}", .{byte});
+        }
     }
-    print("\n", .{});
+
+    if (!state.quiet) {
+        print("\n", .{});
+    }
 
     gptr[data.len] = 0;
 
@@ -67,3 +131,49 @@ pub fn main() void {
         std.process.exit(1);
     }
 }
+
+fn parseArgs(args: *std.process.ArgIterator) ArgsState {
+    var state: ArgsState = .init;
+
+    while (args.next()) |cur| {
+        for (available_args, 0..) |arg, index| {
+            if (std.mem.eql(u8, cur, arg)) {
+                switch (index) {
+                    0 => state.help = true,
+                    1 => state.lower = true,
+                    2 => state.upper = true,
+                    3 => state.trim = true,
+                    4 => state.quiet = true,
+                    else => unreachable,
+                }
+                break;
+            }
+        }
+    }
+
+    return state;
+}
+
+const ArgsState = struct {
+    help: bool,
+    lower: bool,
+    upper: bool,
+    trim: bool,
+    quiet: bool,
+
+    const init: @This() = .{
+        .help = false,
+        .lower = false,
+        .upper = false,
+        .trim = false,
+        .quiet = false,
+    };
+};
+
+const available_args = [_][:0]const u8{
+    "--help", // 0
+    "--lower", // 1
+    "--upper", // 2
+    "--trim", // 3
+    "--quiet", // 4
+};
