@@ -5,7 +5,7 @@ const print = std.debug.print;
 
 const max_bytes = 1048576;
 
-pub fn main() void {
+pub fn main() u8 {
     const stdin = std.io.getStdIn();
     defer stdin.close();
 
@@ -19,7 +19,7 @@ pub fn main() void {
 
     if (args.next() == null) {
         print("zclip: not even a 0th arg?\n", .{});
-        std.process.exit(1);
+        return 1;
     }
 
     const state = parseArgs(&args);
@@ -33,27 +33,52 @@ pub fn main() void {
         print("        --trim    trim whitespace from the text\n", .{});
         print("        --quiet   doesn't print the text\n", .{});
 
-        return;
+        return 0;
     }
 
     // check that the session isn't interactive
     if (stdin.isTty()) {
         print("zclip: data must be piped to stdin\n", .{});
-        std.process.exit(1);
+        return 1;
     }
 
     // read data from stdin
-    var data = stdin.readToEndAlloc(gpa, max_bytes) catch {
+    const ogdata = stdin.readToEndAlloc(gpa, max_bytes) catch {
         print("zclip: input too large - {d} byte limit\n", .{max_bytes});
-        std.process.exit(1);
+        return 1;
     };
-    defer gpa.free(data);
+    defer gpa.free(ogdata);
+
+    var data = ogdata;
+
+    if (data.len <= 0) {
+        print("zclip: input was empty\n", .{});
+        return 1;
+    }
 
     var index: usize = 0;
 
     if (state.lower and state.upper) { // esponge case
-        print("TODO: esponge", .{});
-        std.process.exit(2);
+        index = 0;
+        var upper: bool = true;
+
+        while (index < data.len) : (index += 1) {
+            const char = data[index];
+
+            if (char >= 'a' and char <= 'z') {
+                if (upper) {
+                    data[index] = char - 32;
+                }
+
+                upper = !upper;
+            } else if (char >= 'A' and char <= 'Z') {
+                if (!upper) {
+                    data[index] = char + 32;
+                }
+
+                upper = !upper;
+            }
+        }
     } else {
         if (state.lower) { // lowercase
             index = 0;
@@ -77,10 +102,28 @@ pub fn main() void {
     }
 
     if (state.trim) { // trim
-        print("TODO: trim", .{});
-        std.process.exit(2);
-        var start = 0;
-        var end = data.len;
+        var start: usize = 0;
+        var end: usize = data.len;
+
+        index = 0;
+        while (index < data.len) : ({
+            index += 1;
+            start += 1;
+        }) {
+            if (data[index] != ' ') {
+                break;
+            }
+        }
+
+        index = data.len - 1;
+        while (index < data.len) : ({
+            index -= 1;
+            end -= 1;
+        }) {
+            if (data[index] != ' ') {
+                break;
+            }
+        }
 
         data = data[start..end];
     }
@@ -89,13 +132,13 @@ pub fn main() void {
     const gptr_int = win32.system.memory.GlobalAlloc(.{}, max_bytes + 1);
     if (gptr_int == 0) {
         print("zclip: global alloc failed\n", .{});
-        std.process.exit(1);
+        return 1;
     }
 
     // open clipboard
     if (win32.system.data_exchange.OpenClipboard(null) != 1) {
         print("zclip: open clipboard failed\n", .{});
-        std.process.exit(1);
+        return 1;
     }
     // close clipboard as per documentation
     defer if (win32.system.data_exchange.CloseClipboard() != 1) {
@@ -105,7 +148,7 @@ pub fn main() void {
     // empty clipboard first
     if (win32.system.data_exchange.EmptyClipboard() != 1) {
         print("zclip: empty clipboard failed\n", .{});
-        std.process.exit(1);
+        return 1;
     }
 
     // convert this to a zig-useable pointer of u8
@@ -128,8 +171,10 @@ pub fn main() void {
     const result = win32.system.data_exchange.SetClipboardData(1, gptr);
     if (result == null) {
         print("zclip: set clipboard failed\n", .{});
-        std.process.exit(1);
+        return 1;
     }
+
+    return 0;
 }
 
 fn parseArgs(args: *std.process.ArgIterator) ArgsState {
