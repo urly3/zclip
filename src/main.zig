@@ -60,7 +60,7 @@ pub fn main() u8 {
 
     if (state.lower and state.upper) { // esponge case
         index = 0;
-        var upper: bool = true;
+        var upper: bool = false;
 
         while (index < data.len) : (index += 1) {
             const char = data[index];
