@@ -33,6 +33,7 @@ pub fn main() u8 {
             \\        --upper   uppercase the text
             \\        --trim    trim whitespace from the text
             \\        --quiet   doesn't print the text
+            \\
         , .{});
 
         return 0;
@@ -131,7 +132,7 @@ pub fn main() u8 {
     }
 
     // allocate memory with the global allocator as per documentation
-    const gptr_int = win32.system.memory.GlobalAlloc(.{}, max_bytes + 1);
+    const gptr_int = win32.system.memory.GlobalAlloc(.{}, data.len);
     if (gptr_int == 0) {
         print("zclip: global alloc failed\n", .{});
         return 1;
@@ -153,19 +154,18 @@ pub fn main() u8 {
         return 1;
     }
 
-    // convert this to a zig-useable pointer of u8
+    // convert this to a zig-useable pointer of u8s
     var gptr: [*]u8 = @ptrFromInt(@as(usize, @intCast(gptr_int)));
 
     for (data, 0..) |byte, i| {
         gptr[i] = byte;
     }
+    gptr[data.len] = 0;
 
     // print result
     if (!state.quiet) {
         print("{s}\n", .{data});
     }
-
-    gptr[data.len] = 0;
 
     // hand the memory to the system
     const result = win32.system.data_exchange.SetClipboardData(1, gptr);
