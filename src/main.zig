@@ -25,13 +25,15 @@ pub fn main() u8 {
     const state = parseArgs(&args);
 
     if (state.help) {
-        print("zlcip: copies piped in text to the clipboard\n", .{});
-        print("    valid arguments:\n", .{});
-        print("        --help    print this message\n", .{});
-        print("        --lower   lowercase the text\n", .{});
-        print("        --upper   uppercase the text\n", .{});
-        print("        --trim    trim whitespace from the text\n", .{});
-        print("        --quiet   doesn't print the text\n", .{});
+        print(
+            \\zlcip: copies piped in text to the clipboard
+            \\    valid arguments
+            \\        --help    print this message
+            \\        --lower   lowercase the text
+            \\        --upper   uppercase the text
+            \\        --trim    trim whitespace from the text
+            \\        --quiet   doesn't print the text
+        , .{});
 
         return 0;
     }
@@ -156,13 +158,11 @@ pub fn main() u8 {
 
     for (data, 0..) |byte, i| {
         gptr[i] = byte;
-        if (!state.quiet) {
-            print("{c}", .{byte});
-        }
     }
 
+    // print result
     if (!state.quiet) {
-        print("\n", .{});
+        print("{s}\n", .{data});
     }
 
     gptr[data.len] = 0;
