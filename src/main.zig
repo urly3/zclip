@@ -124,7 +124,7 @@ pub fn main() u8 {
     }
 
     // allocate memory with the global allocator as per documentation
-    const gptr_int = win32.system.memory.GlobalAlloc(.{}, data.len);
+    const gptr_int = win32.system.memory.GlobalAlloc(.{}, data.len + 1);
     if (gptr_int == 0) {
         print("zclip: global alloc failed\n", .{});
         return 1;
@@ -156,7 +156,10 @@ pub fn main() u8 {
 
     // print result
     if (!state.quiet) {
-        print("{s}\n", .{data});
+        print("{s}", .{data});
+        if (data[data.len - 1] != '\n') {
+            print("\n", .{});
+        }
     }
 
     // hand the memory to the system
