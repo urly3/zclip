@@ -6,6 +6,8 @@ const print = std.debug.print;
 const max_bytes = 1048576;
 
 pub fn main() u8 {
+    const stdout = std.io.getStdOut();
+    defer stdout.close();
     const stdin = std.io.getStdIn();
     defer stdin.close();
 
@@ -156,7 +158,13 @@ pub fn main() u8 {
 
     // print result
     if (!state.quiet) {
-        print("{s}", .{data});
+        stdout.writeAll(data) catch {
+            print("zclip: could not write to stdout\n", .{});
+            return 1;
+        };
+        if (!stdout.isTty()) {
+            print("{s}", .{data});
+        }
         if (data[data.len - 1] != '\n') {
             print("\n", .{});
         }
