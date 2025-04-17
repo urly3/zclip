@@ -23,19 +23,17 @@ pub fn main() u8 {
     }
 
     const state = parseArgs(&args);
-
     if (state.help) {
         print(
             \\zlcip: copies piped in text to the clipboard
-            \\    valid arguments
-            \\        --help    print this message
-            \\        --lower   lowercase the text
-            \\        --upper   uppercase the text
-            \\        --trim    trim whitespace from the text
-            \\        --quiet   doesn't print the text
+            \\valid arguments
+            \\  -h [--help]    print this message
+            \\  -l [--lower]   lowercase the text
+            \\  -u [--upper]   uppercase the text
+            \\  -t [--trim]    trim whitespace from the text
+            \\  -q [--quiet]   doesn't print the text
             \\
         , .{});
-
         return 0;
     }
 
@@ -53,32 +51,27 @@ pub fn main() u8 {
     defer gpa.free(ogdata);
 
     var data = ogdata;
-
     if (data.len <= 0) {
         print("zclip: input was empty\n", .{});
         return 1;
     }
 
     var index: usize = 0;
-
     if (state.lower and state.upper) { // esponge case
         index = 0;
         var upper: bool = false;
 
         while (index < data.len) : (index += 1) {
             const char = data[index];
-
             if (char >= 'a' and char <= 'z') {
                 if (upper) {
                     data[index] = char - 32;
                 }
-
                 upper = !upper;
             } else if (char >= 'A' and char <= 'Z') {
                 if (!upper) {
                     data[index] = char + 32;
                 }
-
                 upper = !upper;
             }
         }
@@ -127,7 +120,6 @@ pub fn main() u8 {
                 break;
             }
         }
-
         data = data[start..end];
     }
 
@@ -184,11 +176,11 @@ fn parseArgs(args: *std.process.ArgIterator) ArgsState {
         for (available_args, 0..) |arg, index| {
             if (std.mem.eql(u8, cur, arg)) {
                 switch (index) {
-                    0 => state.help = true,
-                    1 => state.lower = true,
-                    2 => state.upper = true,
-                    3 => state.trim = true,
-                    4 => state.quiet = true,
+                    0, 1 => state.help = true,
+                    2, 3 => state.lower = true,
+                    4, 5 => state.upper = true,
+                    6, 7 => state.trim = true,
+                    8, 9 => state.quiet = true,
                     else => unreachable,
                 }
                 break;
@@ -217,8 +209,13 @@ const ArgsState = struct {
 
 const available_args = [_][:0]const u8{
     "--help", // 0
-    "--lower", // 1
-    "--upper", // 2
-    "--trim", // 3
-    "--quiet", // 4
+    "-h", // 1
+    "--lower", // 2
+    "-l", // 3
+    "--upper", // 4
+    "-u", // 5
+    "--trim", // 6
+    "-t", // 7
+    "--quiet", // 8
+    "-q", // 9
 };
