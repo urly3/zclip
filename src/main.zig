@@ -27,13 +27,13 @@ pub fn main() u8 {
     const state = parseArgs(&args);
     if (state.help) {
         print(
-            \\zlcip: copies piped in text to the clipboard
-            \\valid arguments
+            \\zlcip: copy piped in text to the clipboard
+            \\options:
             \\  -h [--help]    print this message
             \\  -l [--lower]   lowercase the text
             \\  -u [--upper]   uppercase the text
             \\  -t [--trim]    trim whitespace from the text
-            \\  -q [--quiet]   doesn't print the text
+            \\  -q [--quiet]   don't print the result
             \\
         , .{});
         return 0;
@@ -157,14 +157,15 @@ pub fn main() u8 {
     gptr[data.len] = 0;
 
     // print result
-    if (!state.quiet) {
+    if (!stdout.isTty()) {
         stdout.writeAll(data) catch {
             print("zclip: could not write to stdout\n", .{});
             return 1;
         };
-        if (!stdout.isTty()) {
-            print("{s}", .{data});
-        }
+    }
+    if (!state.quiet) {
+        print("{s}", .{data});
+
         if (data[data.len - 1] != '\n') {
             print("\n", .{});
         }
