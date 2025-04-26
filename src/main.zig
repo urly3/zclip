@@ -1,7 +1,7 @@
 const std = @import("std");
-const win32 = @import("win32");
-
 const print = std.debug.print;
+
+const win32 = @import("win32");
 
 const max_bytes = 1048576;
 
