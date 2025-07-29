@@ -5,11 +5,11 @@ const win32 = @import("win32");
 
 const max_bytes = 1048576;
 
-pub fn main() u8 {
-    const stdout = std.io.getStdOut();
-    defer stdout.close();
+pub fn main() !void {
     const stdin = std.io.getStdIn();
     defer stdin.close();
+    const stdout = std.io.getStdOut();
+    defer stdout.close();
 
     var gpalloc = std.heap.DebugAllocator(.{}).init;
     const gpa = gpalloc.allocator();
@@ -21,7 +21,7 @@ pub fn main() u8 {
 
     if (args.next() == null) {
         print("zclip: not even a 0th arg?\n", .{});
-        return 1;
+        return error.NoArgs;
     }
 
     const state = parseArgs(&args);
@@ -42,20 +42,20 @@ pub fn main() u8 {
     // check that the session isn't interactive
     if (stdin.isTty()) {
         print("zclip: data must be piped to stdin\n", .{});
-        return 1;
+        return error.NoInput;
     }
 
     // read data from stdin
     const ogdata = stdin.readToEndAlloc(gpa, max_bytes) catch {
         print("zclip: input too large - {d} byte limit\n", .{max_bytes});
-        return 1;
+        return error.BadInput;
     };
     defer gpa.free(ogdata);
 
     var data = ogdata;
     if (data.len <= 0) {
         print("zclip: input was empty\n", .{});
-        return 1;
+        return error.BadInput;
     }
 
     var index: usize = 0;
@@ -129,23 +129,28 @@ pub fn main() u8 {
     const gptr_int = win32.system.memory.GlobalAlloc(.{}, data.len + 1);
     if (gptr_int == 0) {
         print("zclip: global alloc failed\n", .{});
-        return 1;
+        return error.GAllocFailure;
     }
 
     // open clipboard
     if (win32.system.data_exchange.OpenClipboard(null) != 1) {
         print("zclip: open clipboard failed\n", .{});
-        return 1;
+        return error.ClipboardFailure;
     }
     // close clipboard as per documentation
     defer if (win32.system.data_exchange.CloseClipboard() != 1) {
         print("zclip: failed to close clipboard\n", .{});
     };
 
+    // free memory on error
+    errdefer if (win32.system.memory.GlobalFree(gptr_int) != 0) {
+        print("zclip: global free failed\n", .{});
+    };
+
     // empty clipboard first
     if (win32.system.data_exchange.EmptyClipboard() != 1) {
         print("zclip: empty clipboard failed\n", .{});
-        return 1;
+        return error.ClipboardFailure;
     }
 
     // convert this to a zig-useable pointer of u8s
@@ -175,10 +180,10 @@ pub fn main() u8 {
     const result = win32.system.data_exchange.SetClipboardData(1, gptr);
     if (result == null) {
         print("zclip: set clipboard failed\n", .{});
-        return 1;
+        return error.ClipboardFailure;
     }
 
-    return 0;
+    return;
 }
 
 fn parseArgs(args: *std.process.ArgIterator) ArgsState {
