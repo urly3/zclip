@@ -30,10 +30,10 @@ pub fn main() !void {
             \\zlcip: copy piped in text to the clipboard
             \\options:
             \\  -h [--help]    print this message
-            \\  -l [--lower]   lowercase the text
-            \\  -u [--upper]   uppercase the text
-            \\  -t [--trim]    trim whitespace from the text
-            \\  -q [--quiet]   don't print the result
+            \\  -l [--lower]   lowercase all input
+            \\  -u [--upper]   uppercase all input
+            \\  -t [--trim]    trim whitespace
+            \\  -q [--quiet]   hide output
             \\
         , .{});
         return 0;
