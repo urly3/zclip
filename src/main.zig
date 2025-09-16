@@ -6,9 +6,9 @@ const win32 = @import("win32");
 const max_bytes = 1048576;
 
 pub fn main() !void {
-    const stdin = std.io.getStdIn();
+    const stdin = std.fs.File.stdin();
     defer stdin.close();
-    const stdout = std.io.getStdOut();
+    const stdout = std.fs.File.stdout();
     defer stdout.close();
 
     var gpalloc = std.heap.DebugAllocator(.{}).init;
@@ -25,6 +25,11 @@ pub fn main() !void {
     }
 
     const state = parseArgs(&args);
+    if (state.invalid) {
+        print("zclip: unknown option provided\n", .{});
+        return error.InvalidArg;
+    }
+
     if (state.help) {
         print(
             \\zlcip: copy piped in text to the clipboard
@@ -36,7 +41,7 @@ pub fn main() !void {
             \\  -q [--quiet]   hide output
             \\
         , .{});
-        return 0;
+        return;
     }
 
     // check that the session isn't interactive
@@ -165,7 +170,7 @@ pub fn main() !void {
     if (!stdout.isTty()) {
         stdout.writeAll(data) catch {
             print("zclip: could not write to stdout\n", .{});
-            return 1;
+            return error.StdOutFailure;
         };
     }
     if (!state.quiet) {
@@ -190,6 +195,8 @@ fn parseArgs(args: *std.process.ArgIterator) ArgsState {
     var state: ArgsState = .init;
 
     while (args.next()) |cur| {
+        var invalid_arg: bool = true;
+
         for (available_args, 0..) |arg, index| {
             if (std.mem.eql(u8, cur, arg)) {
                 switch (index) {
@@ -200,15 +207,20 @@ fn parseArgs(args: *std.process.ArgIterator) ArgsState {
                     8, 9 => state.quiet = true,
                     else => unreachable,
                 }
+
+                invalid_arg = false;
                 break;
             }
         }
+
+        state.invalid = invalid_arg;
     }
 
     return state;
 }
 
 const ArgsState = struct {
+    invalid: bool,
     help: bool,
     lower: bool,
     upper: bool,
@@ -216,6 +228,7 @@ const ArgsState = struct {
     quiet: bool,
 
     const init: @This() = .{
+        .invalid = false,
         .help = false,
         .lower = false,
         .upper = false,
